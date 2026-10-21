@@ -9,6 +9,7 @@ import { selectRoleText } from './role-card.js';
 import { socialPersona } from './core/social-persona.js';
 import { stickerPolicy } from './core/sticker-policy.js';
 import { searchPolicy } from '../../../packages/dsh-social-bridge-plugin/search-policy.mjs';
+import { memeLibraryPolicy } from '../../../packages/dsh-social-bridge-plugin/meme-library-policy.mjs';
 import {ProactiveEngine} from './core/proactive-engine.js';
 import { ContextMaintenance } from './core/context-maintenance.js';
 
@@ -31,6 +32,8 @@ const plugin = new DshPluginClient(config.dsh_plugin ?? {}, log);
 import {conversationMode} from '../../../packages/dsh-social-bridge-plugin/conversation-policy.mjs';
 const modeFor=key=>conversationMode(config.search_policy_file?JSON.parse(fs.readFileSync(config.search_policy_file,'utf8').replace(/^\uFEFF/,'' )).wechat:wechat,key);
 const searchPolicyFor=key=>searchPolicy(config.search_policy_file?JSON.parse(fs.readFileSync(config.search_policy_file,'utf8').replace(/^\uFEFF/,'' )).wechat:wechat,key);
+// 该聊天启用 dsh-meme 图库时，表情优先走工具检索，库存候选降为次选。
+const libraryEnabledFor=key=>{try{const settings=config.search_policy_file?JSON.parse(fs.readFileSync(config.search_policy_file,'utf8').replace(/^\uFEFF/,'')):config;return memeLibraryPolicy(settings.wechat??wechat,key).enabled;}catch{return false;}};
 const searchStateFor=async message=>{
   const key=buildConversationKey(message.platform,message.kind,message.conversation_id);
   if(!searchPolicyFor(key).enabled)return null;
@@ -45,7 +48,7 @@ const personaFor = (key) => socialPersona(config, key, (roleName) => {
 const engine = new SocialEngine({ buffer, roleFor: key => personaFor(key).persona,
   personaNameFor: key => personaFor(key).personaName,
   wakeWords: wechat.wake_words ?? [],
-  mode: wechat.wake_mode ?? 'hybrid',modeFor, batchMs: config.social?.batch_ms ?? 3000,
+  mode: wechat.wake_mode ?? 'hybrid',modeFor, libraryEnabledFor, batchMs: config.social?.batch_ms ?? 3000,
   minIntervalMs: config.social?.min_interval_ms ?? 15000,
   privateMinIntervalMs: config.social?.private_min_interval_ms ?? 1000,
   maxPerMinute: config.social?.max_per_minute ?? 3,
